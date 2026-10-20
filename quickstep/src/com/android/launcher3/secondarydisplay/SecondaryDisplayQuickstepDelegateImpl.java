@@ -28,7 +28,6 @@ import android.util.Log;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.window.BackEvent;
-import android.window.DesktopExperienceFlags;
 import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedDispatcher;
 
@@ -37,7 +36,6 @@ import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.dagger.ActivityContextSingleton;
 import com.android.launcher3.model.data.PredictedContainerInfo;
 import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.OverviewComponentObserver;
@@ -140,9 +138,8 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
 
     @Override
     boolean enableTaskbarConnectedDisplays() {
-        // Built-in secondary displays don't get the connected display taskbar
-        return DesktopExperienceFlags.ENABLE_TASKBAR_CONNECTED_DISPLAYS.isTrue()
-                && WindowManagerProxy.INSTANCE.get(mContext).isExternalDisplay(mContext);
+        // SecondaryDisplayLauncher provides its own app drawer on every secondary display.
+        return false;
     }
 
     @Override

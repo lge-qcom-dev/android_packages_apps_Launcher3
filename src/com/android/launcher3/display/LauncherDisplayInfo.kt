@@ -84,7 +84,6 @@ constructor(
 
     /** Returns whether the taskbar is forced to be pinned when home is visible. */
     private val mIsDesktopFormFactor: Boolean = isDesktopFormFactor
-    private val mIsExternalDisplay: Boolean = wmProxy.isExternalDisplay(context)
 
     /**
      * Returns whether the taskbar should be pinned, and showing desktop tasks, because the display
@@ -145,13 +144,10 @@ constructor(
 
     /**
      * Returns `true` if the bounds represent a tablet.
-     *
-     * External displays are always considered tablet.
      */
     fun isLargeScreen(bounds: WindowBounds): Boolean =
         mIsDesktopFormFactor ||
-            smallestSizeDp(bounds) >= WindowManagerProxy.MIN_TABLET_WIDTH ||
-            mIsExternalDisplay
+            smallestSizeDp(bounds) >= WindowManagerProxy.MIN_TABLET_WIDTH
 
     /** Returns smallest size in dp for given bounds. */
     fun smallestSizeDp(bounds: WindowBounds): Float =
