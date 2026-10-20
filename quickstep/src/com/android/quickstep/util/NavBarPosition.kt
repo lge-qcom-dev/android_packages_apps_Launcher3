@@ -29,7 +29,7 @@ data class NavBarPosition(
     constructor(
         mode: NavigationMode,
         info: LauncherDisplayInfo,
-    ) : this(info.isLargeScreen(info.realBounds), info.rotation, mode)
+    ) : this(info.isLargeScreenForNavigation(info.realBounds), info.rotation, mode)
 
     val isRightEdge: Boolean
         get() = mode != NO_BUTTON && displayRotation == Surface.ROTATION_90 && !isLargeScreen

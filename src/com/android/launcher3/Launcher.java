@@ -130,6 +130,7 @@ import android.util.FloatProperty;
 import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.KeyboardShortcutGroup;
 import android.view.Menu;
@@ -665,11 +666,26 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     /**
+     * Creates the device profile used by this launcher activity.
+     */
+    protected DeviceProfile createDeviceProfile(InvariantDeviceProfile idp) {
+        return getDisplayId() == Display.DEFAULT_DISPLAY
+                ? idp.getDeviceProfile(this)
+                : idp.createDeviceProfileForSecondaryDisplay(this);
+    }
+
+    protected boolean isLargeExternalDisplay() {
+        DeviceProfile deviceProfile = getDeviceProfile();
+        return deviceProfile.getDeviceProperties().getDeviceConfiguration().isExternalDisplay()
+                && deviceProfile.getDeviceProperties().isLargeScreen();
+    }
+
+    /**
      * Returns {@code true} if a new DeviceProfile is initialized, and {@code false} otherwise.
      */
     protected boolean initDeviceProfile(InvariantDeviceProfile idp) {
         // Load configuration-specific DeviceProfile
-        DeviceProfile deviceProfile = idp.getDeviceProfile(this);
+        DeviceProfile deviceProfile = createDeviceProfile(idp);
         if (mDeviceProfile == deviceProfile) {
             return false;
         }

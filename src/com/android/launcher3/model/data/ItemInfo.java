@@ -129,6 +129,9 @@ public class ItemInfo {
      */
     public int screenId = -1;
 
+    /** Stable display identity for this workspace item; empty means the primary display. */
+    public String displayKey = "";
+
     /**
      * Indicates the X position of the associated cell.
      */
@@ -224,6 +227,7 @@ public class ItemInfo {
         minSpanY = info.minSpanY;
         rank = info.rank;
         screenId = info.screenId;
+        displayKey = info.displayKey;
         itemType = info.itemType;
         animationType = info.animationType;
         container = info.container;
@@ -293,6 +297,7 @@ public class ItemInfo {
         writer.put(LauncherSettings.Favorites.ITEM_TYPE, itemType)
                 .put(LauncherSettings.Favorites.CONTAINER, container)
                 .put(LauncherSettings.Favorites.SCREEN, screenId)
+                .put(LauncherSettings.Favorites.DISPLAY_KEY, displayKey)
                 .put(LauncherSettings.Favorites.CELLX, cellX)
                 .put(LauncherSettings.Favorites.CELLY, cellY)
                 .put(LauncherSettings.Favorites.SPANX, spanX)
@@ -304,6 +309,7 @@ public class ItemInfo {
         itemType = values.getAsInteger(LauncherSettings.Favorites.ITEM_TYPE);
         container = values.getAsInteger(LauncherSettings.Favorites.CONTAINER);
         screenId = values.getAsInteger(LauncherSettings.Favorites.SCREEN);
+        displayKey = values.getAsString(LauncherSettings.Favorites.DISPLAY_KEY);
         cellX = values.getAsInteger(LauncherSettings.Favorites.CELLX);
         cellY = values.getAsInteger(LauncherSettings.Favorites.CELLY);
         spanX = values.getAsInteger(LauncherSettings.Favorites.SPANX);

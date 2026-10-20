@@ -19,6 +19,7 @@
 -->
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.android.launcher3">
     <uses-sdk android:targetSdkVersion="29" android:minSdkVersion="25"/>
     <!--
@@ -69,6 +70,22 @@
             <meta-data
                 android:name="com.android.launcher3.themedicon.option"
                 android:value="${packageName}.grid_control" />
+        </activity>
+
+        <activity
+            android:name="com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher"
+            tools:node="remove" />
+        <activity
+            android:name="com.android.launcher3.secondarydisplay.SecondaryDisplayQuickstepLauncher"
+            android:theme="@style/AppTheme"
+            android:launchMode="singleTop"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.SECONDARY_HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
     </application>

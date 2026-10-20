@@ -50,11 +50,6 @@ public final class FeatureFlags {
      * and set a default value for the flag. This will be the default value on Debug builds.
      * <p>
      */
-    // TODO(Block 6): Clean up flags
-    public static final BooleanFlag SECONDARY_DRAG_N_DROP_TO_PIN = getDebugFlag(270395140,
-            "SECONDARY_DRAG_N_DROP_TO_PIN", DISABLED,
-            "Enable dragging and dropping to pin apps within secondary display");
-
     // TODO(Block 8): Clean up flags
 
     // TODO(Block 9): Clean up flags

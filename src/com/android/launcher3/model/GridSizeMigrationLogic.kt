@@ -230,24 +230,22 @@ constructor(
         destReader: DbReader,
         idsInUse: MutableList<Int>,
     ) {
-        if (hotseatToBeAdded.isEmpty()) {
-            return
-        }
-
         idsInUse.addAll(dstHotseatItems.map { entry: DbEntry -> entry.id })
 
-        hotseatToBeAdded.sort()
-
-        val placementSolutionHotseat =
-            solveHotseatPlacement(destHotseatSize, dstHotseatItems, hotseatToBeAdded)
-        for (entryToPlace in placementSolutionHotseat) {
-            GridSizeMigrationDBController.insertEntryInDb(
-                helper,
-                entryToPlace,
-                srcReader.mTableName,
-                destReader.mTableName,
-                idsInUse,
-            )
+        hotseatToBeAdded.groupBy { it.displayKey }.forEach { (displayKey, itemsToPlace) ->
+            val displayHotseatItems = dstHotseatItems.filter { it.displayKey == displayKey }
+            val sortedItemsToPlace = itemsToPlace.toMutableList().apply { sort() }
+            val placementSolutionHotseat =
+                solveHotseatPlacement(destHotseatSize, displayHotseatItems, sortedItemsToPlace)
+            for (entryToPlace in placementSolutionHotseat) {
+                GridSizeMigrationDBController.insertEntryInDb(
+                    helper,
+                    entryToPlace,
+                    srcReader.mTableName,
+                    destReader.mTableName,
+                    idsInUse,
+                )
+            }
         }
     }
 
@@ -315,63 +313,45 @@ constructor(
         destReader: DbReader,
         idsInUse: MutableList<Int>,
     ) {
-        if (workspaceToBeAdded.isEmpty()) {
-            return
-        }
-
         idsInUse.addAll(dstWorkspaceItems.map { entry: DbEntry -> entry.id })
 
-        workspaceToBeAdded.sort()
+        workspaceToBeAdded.groupBy { it.displayKey }.forEach { (displayKey, itemsToPlace) ->
+            val displayWorkspaceItems = dstWorkspaceItems.filter { it.displayKey == displayKey }
+            val lastScreenId = displayWorkspaceItems.maxOfOrNull { it.screenId } ?: 0
+            val sortedItemsToPlace = itemsToPlace.toMutableList().apply { sort() }
 
-        // First we create a collection of the screens
-        val screens: MutableList<Int> = ArrayList()
-        for (screenId in 0..destReader.mLastScreenId) {
-            screens.add(screenId)
-        }
+            // Place each display's items against only that display's occupied cells.
+            var placement = WorkspaceItemsToPlace(sortedItemsToPlace, mutableListOf())
+            for (screenId in 0..lastScreenId) {
+                if (DEBUG) {
+                    Log.d(TAG, "Migrating $displayKey screen $screenId")
+                }
+                placement =
+                    solveGridPlacement(
+                        screenId,
+                        trgX,
+                        trgY,
+                        placement.mRemainingItemsToPlace,
+                        destReader.mWorkspaceEntriesByScreenId[displayKey to screenId],
+                    )
+                placeItems(placement, helper, srcReader, destReader, idsInUse)
+                if (placement.mRemainingItemsToPlace.isEmpty()) break
+            }
 
-        // Then we place the items on the screens
-        var itemsToPlace = WorkspaceItemsToPlace(workspaceToBeAdded, mutableListOf())
-        for (screenId in screens) {
-            if (DEBUG) {
-                Log.d(TAG, "Migrating $screenId")
+            // Items that do not fit on existing screens are placed on new screens for this display.
+            var screenId = lastScreenId + 1
+            while (placement.mRemainingItemsToPlace.isNotEmpty()) {
+                placement =
+                    solveGridPlacement(
+                        screenId,
+                        trgX,
+                        trgY,
+                        placement.mRemainingItemsToPlace,
+                        destReader.mWorkspaceEntriesByScreenId[displayKey to screenId],
+                    )
+                placeItems(placement, helper, srcReader, destReader, idsInUse)
+                screenId++
             }
-            itemsToPlace =
-                solveGridPlacement(
-                    screenId,
-                    trgX,
-                    trgY,
-                    itemsToPlace.mRemainingItemsToPlace,
-                    destReader.mWorkspaceEntriesByScreenId[screenId],
-                )
-            placeItems(itemsToPlace, helper, srcReader, destReader, idsInUse)
-            while (itemsToPlace.mPlacementSolution.isNotEmpty()) {
-                GridSizeMigrationDBController.insertEntryInDb(
-                    helper,
-                    itemsToPlace.mPlacementSolution.removeAt(0),
-                    srcReader.mTableName,
-                    destReader.mTableName,
-                    idsInUse,
-                )
-            }
-            if (itemsToPlace.mRemainingItemsToPlace.isEmpty()) {
-                break
-            }
-        }
-
-        // In case the new grid is smaller, there might be some leftover items that don't fit on
-        // any of the screens, in this case we add them to new screens until all of them are placed.
-        var screenId = destReader.mLastScreenId + 1
-        while (itemsToPlace.mRemainingItemsToPlace.isNotEmpty()) {
-            itemsToPlace =
-                solveGridPlacement(
-                    screenId,
-                    trgX,
-                    trgY,
-                    itemsToPlace.mRemainingItemsToPlace,
-                    destReader.mWorkspaceEntriesByScreenId[screenId],
-                )
-            placeItems(itemsToPlace, helper, srcReader, destReader, idsInUse)
-            screenId++
         }
     }
 

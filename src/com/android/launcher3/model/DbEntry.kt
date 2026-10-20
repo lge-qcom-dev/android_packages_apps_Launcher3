@@ -88,26 +88,27 @@ class DbEntry : ItemInfo(), Comparable<DbEntry> {
      * even thought they have different database ids.
      */
     private fun getEntryMigrationId(): String? {
-        when (itemType) {
+        val itemMigrationId = when (itemType) {
             ITEM_TYPE_FOLDER,
-            ITEM_TYPE_APP_GROUP -> return getFolderMigrationId()
+            ITEM_TYPE_APP_GROUP -> getFolderMigrationId()
             ITEM_TYPE_APPWIDGET ->
                 // mProvider is the app the widget belongs to and appWidgetId it's the unique
                 // is of the widget, we need both because if you remove a widget and then add it
                 // again, then it can change and the WidgetProvider would not know the widget.
-                return mProvider + appWidgetId
+                mProvider + appWidgetId
             ITEM_TYPE_APPLICATION -> {
                 val intentStr = mIntent?.let { cleanIntentString(it) }
                 try {
                     val i = Intent.parseUri(intentStr, 0)
-                    return Objects.requireNonNull(i.component).toString()
+                    Objects.requireNonNull(i.component).toString()
                 } catch (e: Exception) {
-                    return intentStr
+                    intentStr
                 }
             }
 
-            else -> return mIntent?.let { cleanIntentString(it) }
+            else -> mIntent?.let { cleanIntentString(it) }
         }
+        return itemMigrationId?.let { "$displayKey|$it" }
     }
 
     /**

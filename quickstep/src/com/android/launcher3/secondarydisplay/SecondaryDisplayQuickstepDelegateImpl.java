@@ -16,7 +16,6 @@
 package com.android.launcher3.secondarydisplay;
 
 import static androidx.lifecycle.Lifecycle.State.RESUMED;
-import static com.android.launcher3.util.OnboardingPrefs.ALL_APPS_VISITED_COUNT;
 import static com.android.quickstep.fallback.RecentsState.HIDDEN;
 import static com.android.window.flags.Flags.useInputReportedFocusForAccessibility;
 
@@ -28,16 +27,10 @@ import android.util.Log;
 import android.view.Display;
 import android.view.KeyEvent;
 import android.window.BackEvent;
-import android.window.DesktopExperienceFlags;
 import android.window.OnBackAnimationCallback;
 import android.window.OnBackInvokedDispatcher;
 
-import com.android.launcher3.appprediction.AppsDividerView;
-import com.android.launcher3.appprediction.PredictionRowView;
 import com.android.launcher3.dagger.ActivityContextSingleton;
-import com.android.launcher3.model.data.PredictedContainerInfo;
-import com.android.launcher3.taskbar.TaskbarActivityContext;
-import com.android.launcher3.util.window.WindowManagerProxy;
 import com.android.launcher3.views.ActivityContext;
 import com.android.quickstep.BaseContainerInterface;
 import com.android.quickstep.OverviewComponentObserver;
@@ -66,6 +59,8 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
             RecentsWindowManager recentsWindowManager = getVisibleRecentsWindowManager();
             if (recentsWindowManager != null) {
                 recentsWindowManager.getOnBackInvokedCallback().onBackInvoked();
+            } else if (mActivityContext instanceof Activity activity) {
+                activity.onBackPressed();
             }
         }
 
@@ -120,39 +115,6 @@ public final class SecondaryDisplayQuickstepDelegateImpl extends SecondaryDispla
         if (mActivityContext instanceof Activity activity) {
             activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
                     mOnBackInvokedCallback);
-        }
-    }
-
-    @Override
-    void updateAppDivider() {
-        mActivityContext.getAppsView().getFloatingHeaderView()
-                .findFixedRowByType(AppsDividerView.class)
-                .setShowAllAppsLabel(!ALL_APPS_VISITED_COUNT.hasReachedMax(mContext));
-        ALL_APPS_VISITED_COUNT.increment(mContext);
-    }
-
-    @Override
-    public void setPredictedApps(PredictedContainerInfo info) {
-        mActivityContext.getAppsView().getFloatingHeaderView()
-                .findFixedRowByType(PredictionRowView.class)
-                .setPredictedApps(info.getContents());
-    }
-
-    @Override
-    boolean enableTaskbarConnectedDisplays() {
-        // Built-in secondary displays don't get the connected display taskbar
-        return DesktopExperienceFlags.ENABLE_TASKBAR_CONNECTED_DISPLAYS.isTrue()
-                && WindowManagerProxy.INSTANCE.get(mContext).isExternalDisplay(mContext);
-    }
-
-    @Override
-    void openAllAppsForDisplay(int displayId) {
-        var conn = mSysUIConnectionTracker.getActiveComponent().getValue();
-        if (conn == null) return;
-        TaskbarActivityContext currentDisplayTaskbarContext =
-                conn.getTaskbarManager().getTaskbarForDisplay(displayId);
-        if (currentDisplayTaskbarContext != null) {
-            currentDisplayTaskbarContext.openTaskbarAllApps();
         }
     }
 

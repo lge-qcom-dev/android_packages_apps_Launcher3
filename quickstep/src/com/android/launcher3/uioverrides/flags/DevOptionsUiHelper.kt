@@ -48,7 +48,7 @@ import com.android.launcher3.LauncherPrefs.Companion.COMPOSITION_TRACING_PREF_KE
 import com.android.launcher3.R
 import com.android.launcher3.dagger.LauncherComponentProvider.appComponent
 import com.android.launcher3.proxy.ProxyActivityStarter
-import com.android.launcher3.secondarydisplay.SecondaryDisplayLauncher
+import com.android.launcher3.secondarydisplay.SecondaryDisplayQuickstepLauncher
 import com.android.launcher3.uioverrides.plugins.PluginManagerWrapperImpl
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
 import com.android.launcher3.util.Executors.ORDERED_BG_EXECUTOR
@@ -374,7 +374,7 @@ class DevOptionsUiHelper(c: Context, attr: AttributeSet?) : PreferenceGroup(c, a
                 Preference(context).apply {
                     title = "Launch Secondary Display"
                     intent =
-                        Intent(context, SecondaryDisplayLauncher::class.java)
+                        Intent(context, SecondaryDisplayQuickstepLauncher::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             )
