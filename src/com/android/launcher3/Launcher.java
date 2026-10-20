@@ -665,11 +665,18 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     /**
+     * Creates the device profile used by this launcher activity.
+     */
+    protected DeviceProfile createDeviceProfile(InvariantDeviceProfile idp) {
+        return idp.getDeviceProfile(this);
+    }
+
+    /**
      * Returns {@code true} if a new DeviceProfile is initialized, and {@code false} otherwise.
      */
     protected boolean initDeviceProfile(InvariantDeviceProfile idp) {
         // Load configuration-specific DeviceProfile
-        DeviceProfile deviceProfile = idp.getDeviceProfile(this);
+        DeviceProfile deviceProfile = createDeviceProfile(idp);
         if (mDeviceProfile == deviceProfile) {
             return false;
         }

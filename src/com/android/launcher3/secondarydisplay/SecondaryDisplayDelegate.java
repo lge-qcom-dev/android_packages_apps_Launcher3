@@ -18,7 +18,6 @@ package com.android.launcher3.secondarydisplay;
 import android.view.KeyEvent;
 
 import com.android.launcher3.dagger.ActivityContextSingleton;
-import com.android.launcher3.model.data.PredictedContainerInfo;
 
 import javax.inject.Inject;
 
@@ -30,25 +29,6 @@ public class SecondaryDisplayDelegate {
 
     @Inject
     public SecondaryDisplayDelegate() {
-    }
-
-    /**
-     * Setup/update app divider separating app predictions from All Apps.
-     */
-    void updateAppDivider() {
-    }
-
-    /**
-     * Set predicted apps in top of app drawer.
-     */
-    public void setPredictedApps(PredictedContainerInfo item) {
-    }
-
-    boolean enableTaskbarConnectedDisplays() {
-        return false;
-    }
-
-    void openAllAppsForDisplay(int displayId) {
     }
 
     /**
