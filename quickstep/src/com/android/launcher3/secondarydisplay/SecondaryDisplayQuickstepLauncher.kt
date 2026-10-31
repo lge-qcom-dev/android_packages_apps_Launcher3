@@ -40,7 +40,7 @@ class SecondaryDisplayQuickstepLauncher : QuickstepLauncher() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        secondaryDisplayDelegate = activityComponent.secondaryDisplayDelegate.also {
+        secondaryDisplayDelegate = activityComponent.getSecondaryDisplayDelegate().also {
             it.onCreate()
         }
     }

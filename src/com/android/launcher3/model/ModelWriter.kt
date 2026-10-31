@@ -18,6 +18,7 @@ package com.android.launcher3.model
 import android.content.ContentValues
 import android.content.Context
 import android.util.Log
+import android.view.Display
 import com.android.launcher3.Flags
 import com.android.launcher3.LauncherModel
 import com.android.launcher3.LauncherSettings.Favorites
@@ -52,6 +53,16 @@ open class ModelWriter(
     protected val modelExecutor: Executor = Executors.MODEL_EXECUTOR,
 ) : IModelWriter {
 
+    private val displayKey: String =
+        (modificationSource as? ModificationSource.UISurface)?.surface?.asContext()?.display
+            ?.takeIf { it.displayId != Display.DEFAULT_DISPLAY }
+            ?.uniqueId.orEmpty()
+    private val isUiSurface = modificationSource is ModificationSource.UISurface
+
+    private fun setDisplayKeyIfNeeded(item: ItemInfo) {
+        if (isUiSurface) item.displayKey = displayKey
+    }
+
     private interface QueuedTransaction {
         fun execute()
     }
@@ -76,6 +87,7 @@ open class ModelWriter(
 
         override fun addItemsToDatabase(items: List<ItemInfo>) {
             items.forEach {
+                setDisplayKeyIfNeeded(it)
                 if (it.id == ItemInfo.NO_ID) {
                     it.id = model.modelDbController.generateNewItemId()
                 }
@@ -107,6 +119,7 @@ open class ModelWriter(
         }
 
         override fun moveItemsInDatabase(items: List<ItemInfo>, container: Int, screen: Int) {
+            items.forEach(::setDisplayKeyIfNeeded)
             outChangeLog.itemsModified.addAll(items)
             val contentValues =
                 items.map { item ->
@@ -116,6 +129,7 @@ open class ModelWriter(
                         put(Favorites.CELLY, item.cellY)
                         put(Favorites.RANK, item.rank)
                         put(Favorites.SCREEN, item.screenId)
+                        put(Favorites.DISPLAY_KEY, item.displayKey)
                     }
                 }
 
@@ -138,6 +152,7 @@ open class ModelWriter(
         }
 
         override fun updateItemInDatabase(item: ItemInfo) {
+            setDisplayKeyIfNeeded(item)
             outChangeLog.itemsModified.add(item)
             val writer = ContentWriter(context)
             item.onAddToDatabase(writer)
@@ -146,7 +161,10 @@ open class ModelWriter(
         }
 
         override fun deleteItemsFromDatabase(matcher: Predicate<ItemInfo?>, reason: String?) {
-            performDeleteItemsFromDatabase({ item -> matcher.test(item) }, reason)
+            performDeleteItemsFromDatabase(
+                { item -> (!isUiSurface || item.displayKey == displayKey) && matcher.test(item) },
+                reason,
+            )
         }
 
         private fun performDeleteItemsFromDatabase(
@@ -190,8 +208,17 @@ open class ModelWriter(
         }
 
         override fun deleteAllItems() {
-            model.modelDbController.createEmptyDB()
-            bgDataModel.clear()
+            if (!isUiSurface) {
+                model.modelDbController.createEmptyDB()
+                bgDataModel.clear()
+            } else {
+                model.modelDbController.delete(
+                    "${Favorites.DISPLAY_KEY} = ?",
+                    arrayOf(displayKey),
+                )
+                val itemsToDelete = bgDataModel.itemsIdMap.filter { it.displayKey == displayKey }
+                bgDataModel.removeItems(context, itemsToDelete, modificationSource)
+            }
         }
     }
 
@@ -263,6 +290,7 @@ open class ModelWriter(
         item.cellX = modelPos.cellX
         item.cellY = modelPos.cellY
         item.screenId = modelPos.screenId
+        setDisplayKeyIfNeeded(item)
     }
 
     /**

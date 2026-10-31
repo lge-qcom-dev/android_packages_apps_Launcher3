@@ -19,10 +19,12 @@ import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Point
 import android.graphics.Rect
+import android.hardware.display.DisplayManager
 import android.util.ArrayMap
 import android.util.ArraySet
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Display
 import android.view.DisplayCutout
 import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
@@ -46,7 +48,7 @@ class LauncherDisplayInfo
 constructor(
     // Display context
     @JvmField val context: Context,
-    wmProxy: WindowManagerProxy,
+    private val wmProxy: WindowManagerProxy,
     isDesktopFormFactor: Boolean =
         Flags.enableScalabilityForDesktopExperience() &&
             context.resources.getBoolean(R.bool.desktop_form_factor),
@@ -84,6 +86,9 @@ constructor(
 
     /** Returns whether the taskbar is forced to be pinned when home is visible. */
     private val mIsDesktopFormFactor: Boolean = isDesktopFormFactor
+    private val mIsDefaultDisplay: Boolean =
+        wmProxy.getDisplay(context)?.displayId == Display.DEFAULT_DISPLAY
+    private val mIsPrimaryStyleDisplay: Boolean = wmProxy.isPrimaryStyleDisplay(context)
 
     /**
      * Returns whether the taskbar should be pinned, and showing desktop tasks, because the display
@@ -148,6 +153,32 @@ constructor(
     fun isLargeScreen(bounds: WindowBounds): Boolean =
         mIsDesktopFormFactor ||
             smallestSizeDp(bounds) >= WindowManagerProxy.MIN_TABLET_WIDTH
+
+    /**
+     * Returns the screen-size classification used for navigation placement. A display configured
+     * as primary-style follows the primary display's navigation layout, while keeping its own
+     * workspace profile and bounds.
+     */
+    fun isLargeScreenForNavigation(bounds: WindowBounds): Boolean =
+        if (mIsPrimaryStyleDisplay && !mIsDefaultDisplay) {
+            isPrimaryDisplayLargeScreen()
+        } else {
+            isLargeScreen(bounds)
+        }
+
+    private fun isPrimaryDisplayLargeScreen(): Boolean {
+        val displayManager = context.getSystemService(DisplayManager::class.java)
+        val primaryDisplay = displayManager.getDisplay(Display.DEFAULT_DISPLAY) ?: return false
+        val primaryContext = context.createDisplayContext(primaryDisplay)
+        val primaryInfo = wmProxy.getDisplayInfo(primaryContext)
+        val primaryBounds = wmProxy.getRealBounds(primaryContext, primaryInfo)
+        val smallestSizeDp =
+            Utilities.dpiFromPx(
+                min(primaryBounds.bounds.width(), primaryBounds.bounds.height()).toFloat(),
+                primaryContext.resources.configuration.densityDpi,
+            )
+        return mIsDesktopFormFactor || smallestSizeDp >= WindowManagerProxy.MIN_TABLET_WIDTH
+    }
 
     /** Returns smallest size in dp for given bounds. */
     fun smallestSizeDp(bounds: WindowBounds): Float =

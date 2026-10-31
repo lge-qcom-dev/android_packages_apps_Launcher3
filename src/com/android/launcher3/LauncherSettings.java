@@ -331,6 +331,9 @@ public class LauncherSettings {
          */
         public static final String APPWIDGET_SOURCE = "appWidgetSource";
 
+        /** Stable display identity used to keep workspace placements isolated per display. */
+        public static final String DISPLAY_KEY = "displayKey";
+
         public static void addTableToDb(SQLiteDatabase db, long myProfileId, boolean optional) {
             addTableToDb(db, myProfileId, optional, TABLE_NAME);
         }
@@ -364,6 +367,7 @@ public class LauncherSettings {
             columnsToTypes.put(RANK, "INTEGER NOT NULL DEFAULT 0");
             columnsToTypes.put(OPTIONS, "INTEGER NOT NULL DEFAULT 0");
             columnsToTypes.put(APPWIDGET_SOURCE, "INTEGER NOT NULL DEFAULT -1");
+            columnsToTypes.put(DISPLAY_KEY, "TEXT NOT NULL DEFAULT ''");
             return columnsToTypes;
         }
 

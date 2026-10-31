@@ -24,6 +24,7 @@ import com.android.launcher3.LauncherSettings.Favorites.APPWIDGET_SOURCE
 import com.android.launcher3.LauncherSettings.Favorites.CELLX
 import com.android.launcher3.LauncherSettings.Favorites.CELLY
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER
+import com.android.launcher3.LauncherSettings.Favorites.DISPLAY_KEY
 import com.android.launcher3.LauncherSettings.Favorites.ICON
 import com.android.launcher3.LauncherSettings.Favorites.INTENT
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE
@@ -54,6 +55,7 @@ open class ModelCursorWrapper(cursor: Cursor, private val queriedColumns: Array<
     val rank: Int by RANK.delegateInt()
     val options: Int by OPTIONS.delegateInt()
     val screen: Int by SCREEN.delegateInt()
+    val displayKey: String? by DISPLAY_KEY.delegateString()
     val itemType: Int by ITEM_TYPE.delegateInt()
 
     val restoreFlagOnDisk: Int by RESTORED.delegateInt()

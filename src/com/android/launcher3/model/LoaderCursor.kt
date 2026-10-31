@@ -85,7 +85,7 @@ constructor(
 
     private val itemsToRemove = IntArray()
     private val restoredRows = IntArray()
-    private val occupied = IntSparseArrayMap<GridOccupancy>()
+    private val occupied = HashMap<Pair<String, Int>, GridOccupancy>()
 
     // CollectionInfo objects, which have not yet been loaded from the DB, but are expected to
     // found eventually as the loading progresses
@@ -354,6 +354,7 @@ constructor(
         info.id = id
         info.container = container
         info.screenId = screen
+        info.displayKey = displayKey.orEmpty()
         info.cellX = cellX
         info.cellY = cellY
     }
@@ -420,7 +421,8 @@ constructor(
     fun checkItemPlacement(item: ItemInfo): Boolean {
         val containerIndex = item.screenId
         if (item.container == CONTAINER_HOTSEAT) {
-            val hotseatOccupancy = occupied[CONTAINER_HOTSEAT]
+            val hotseatKey = item.displayKey to CONTAINER_HOTSEAT
+            val hotseatOccupancy = occupied[hotseatKey]
 
             if (item.screenId >= idp.numDatabaseHotseatIcons) {
                 Log.e(
@@ -444,7 +446,7 @@ constructor(
             } else {
                 val occupancy = GridOccupancy(idp.numDatabaseHotseatIcons, 1)
                 occupancy.cells[item.screenId][0] = true
-                occupied.put(CONTAINER_HOTSEAT, occupancy)
+                occupied[hotseatKey] = occupancy
                 return true
             }
         } else if (item.container != CONTAINER_DESKTOP) {
@@ -467,10 +469,11 @@ constructor(
             return false
         }
 
-        if (!occupied.containsKey(item.screenId)) {
-            occupied.put(item.screenId, GridOccupancy(countX + 1, countY + 1))
+        val screenKey = item.displayKey to item.screenId
+        if (!occupied.containsKey(screenKey)) {
+            occupied[screenKey] = GridOccupancy(countX + 1, countY + 1)
         }
-        val occupancy = occupied[item.screenId]
+        val occupancy = occupied.getValue(screenKey)
 
         // Check if any workspace icons overlap with each other
         if (occupancy.isRegionVacant(item.cellX, item.cellY, item.spanX, item.spanY)) {

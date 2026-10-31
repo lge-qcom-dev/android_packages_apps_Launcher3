@@ -6,6 +6,7 @@ import android.os.Trace
 import android.util.Log
 import android.util.Pair
 import android.util.SparseArray
+import android.view.Display
 import androidx.annotation.AnyThread
 import androidx.annotation.UiThread
 import androidx.annotation.VisibleForTesting
@@ -33,6 +34,7 @@ import com.android.launcher3.model.data.WorkspaceChangeEvent.FullRefresh
 import com.android.launcher3.model.data.WorkspaceChangeEvent.RemoveEvent
 import com.android.launcher3.model.data.WorkspaceChangeEvent.UpdateEvent
 import com.android.launcher3.model.data.WorkspaceData
+import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.popup.PopupContainer
 import com.android.launcher3.util.Executors
 import com.android.launcher3.util.Executors.MAIN_EXECUTOR
@@ -57,6 +59,10 @@ import java.util.function.Consumer
 import java.util.function.Predicate
 
 class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
+
+    private val displayKey: String
+        get() =
+            launcher.display?.takeIf { it.displayId != Display.DEFAULT_DISPLAY }?.uniqueId.orEmpty()
 
     @VisibleForTesting var activeBindTask = AtomicReference(CancellationSignal())
 
@@ -87,24 +93,31 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
                 if (ev.isSource(launcher)) return@forEach
 
                 when (ev) {
-                    is AddEvent -> bindWorkspaceItemsAdded(ev.items)
-                    is RemoveEvent -> bindWorkspaceItemsRemoved(ev.items)
-                    is UpdateEvent -> bindWorkspaceItemsUpdated(ev.items)
-                    is FullRefresh ->
+                    is AddEvent -> bindWorkspaceItemsAdded(ev.items.filterForDisplay())
+                    is RemoveEvent ->
+                        bindWorkspaceItemsRemoved(
+                            ev.items.and(Predicate { it?.isForCurrentDisplay() == true })
+                        )
+                    is UpdateEvent ->
+                        bindWorkspaceItemsUpdated(ev.items.filterForDisplay().toSet())
+                    is FullRefresh -> {
+                        val seededItems = seedDisplayLayoutIfNeeded(workspaceState.value)
                         bindModelWithAsyncInflation(
-                            itemIdMap = workspaceState.value,
+                            itemIdMap = workspaceState.value.forDisplay(seededItems),
                             isBindingSync = false,
                             reason = ev.reason,
                         )
+                    }
                 }
             }
         )
 
         if (workspaceState.value.version > 0) {
+            val seededItems = seedDisplayLayoutIfNeeded(workspaceState.value)
             // If the data is already loaded, bind synchronously so that the first screen is shown
             // immediately
             bindModelWithAsyncInflation(
-                itemIdMap = workspaceState.value,
+                itemIdMap = workspaceState.value.forDisplay(seededItems),
                 isBindingSync = true,
                 reason = "initial-bind-on-create",
             )
@@ -116,11 +129,51 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         val workspaceState = launcher.appComponent.homeScreenRepository.workspaceState
         if (workspaceState.value.version > 0) {
             bindModelWithAsyncInflation(
-                itemIdMap = workspaceState.value,
+                itemIdMap = workspaceState.value.forDisplay(),
                 isBindingSync = true,
                 reason = "rebinding-on-config-change",
             )
         }
+    }
+
+    private fun ItemInfo.isForCurrentDisplay() = displayKey == this@ModelCallbacks.displayKey
+
+    private fun Collection<ItemInfo>.filterForDisplay() = filter { it.isForCurrentDisplay() }
+
+    private fun WorkspaceData.forDisplay(
+        extraItems: Collection<ItemInfo> = emptyList()
+    ): WorkspaceData =
+        WorkspaceData.MutableWorkspaceData().apply {
+            modifyItems {
+                this@forDisplay.filter { it.isForCurrentDisplay() }.forEach { put(it.id, it) }
+                extraItems.forEach { put(it.id, it) }
+            }
+        }.copy()
+
+    private fun seedDisplayLayoutIfNeeded(data: WorkspaceData): List<WorkspaceItemInfo> {
+        if (displayKey.isEmpty()) return emptyList()
+        val prefs = launcher.sharedPrefs
+        val initializedKey = "secondary_layout_initialized_$displayKey"
+        if (prefs.getBoolean(initializedKey, false)) return emptyList()
+        prefs.edit().putBoolean(initializedKey, true).apply()
+
+        val initialItems =
+            data.filter {
+                it.displayKey.isEmpty() &&
+                    (it.container == CONTAINER_DESKTOP || it.container == CONTAINER_HOTSEAT) &&
+                    it is WorkspaceItemInfo
+            }
+        if (initialItems.isEmpty()) return emptyList()
+
+        val copies =
+            initialItems.map {
+                (it as WorkspaceItemInfo).clone().apply {
+                    id = launcher.model.modelDbController.generateNewItemId()
+                    displayKey = this@ModelCallbacks.displayKey
+                }
+            }
+        launcher.modelWriter.addItemsToDatabase(copies)
+        return copies
     }
 
     /**
@@ -260,7 +313,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
 
     override fun bindItemsUpdated(updates: Set<ItemInfo>) {
         if (useModelRepositoryBinding()) return
-        bindWorkspaceItemsUpdated(updates)
+        bindWorkspaceItemsUpdated(updates.filterForDisplay().toSet())
     }
 
     /**
@@ -368,7 +421,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
 
     override fun bindItemsAdded(items: List<ItemInfo>) {
         if (useModelRepositoryBinding()) return
-        bindWorkspaceItemsAdded(items)
+        bindWorkspaceItemsAdded(items.filterForDisplay())
     }
 
     private fun bindWorkspaceItemsAdded(items: List<ItemInfo>) {
@@ -473,8 +526,11 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
             return
         }
 
+        val seededItems = seedDisplayLayoutIfNeeded(itemIdMap)
+        val displayScopedItems = itemIdMap.forDisplay(seededItems)
+
         if (Flags.simplifiedLauncherModelBinding()) {
-            bindModelWithAsyncInflation(itemIdMap, isBindingSync, "bindCompleteModelAsync")
+            bindModelWithAsyncInflation(displayScopedItems, isBindingSync, "bindCompleteModelAsync")
             return
         }
         val taskTracker = CancellationSignal()
@@ -506,7 +562,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
 
         MAIN_EXECUTOR.execute { clearPendingBinds() }
 
-        val orderedScreenIds = itemIdMap.collectWorkspaceScreens()
+        val orderedScreenIds = displayScopedItems.collectWorkspaceScreens()
         val currentScreenIds = getPagesToBindSynchronously(orderedScreenIds)
 
         fun setupPendingBind(pendingExecutor: Executor) {
@@ -521,7 +577,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         val otherWorkspaceItems = ArrayList<ItemInfo>()
 
         val currentScreenCheck = currentScreenContentFilter(currentScreenIds)
-        itemIdMap.forEach { item: ItemInfo ->
+        displayScopedItems.forEach { item: ItemInfo ->
             if (currentScreenCheck.test(item)) {
                 currentWorkspaceItems.add(item)
             } else if (item.container == CONTAINER_DESKTOP) {
@@ -541,7 +597,7 @@ class ModelCallbacks(private var launcher: Launcher) : BgDataModel.Callbacks {
         // Load items on the current page.
         inflateAsyncAndBind(currentWorkspaceItems, MAIN_EXECUTOR)
 
-        itemIdMap
+        displayScopedItems
             .mapNotNull { if (it is PredictedContainerInfo) it else null }
             .forEach { executeCallbacksTask { launcher.bindPredictedContainerInfo(it) } }
 

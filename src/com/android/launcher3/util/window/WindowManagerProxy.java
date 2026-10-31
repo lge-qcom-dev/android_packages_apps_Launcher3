@@ -173,10 +173,15 @@ public class WindowManagerProxy {
         Insets navInsets = oldInsets.getInsets(WindowInsets.Type.navigationBars());
         Insets cutoutInsets = oldInsets.getInsets(WindowInsets.Type.displayCutout());
 
-        Resources systemRes = context.getResources();
-        Configuration config = systemRes.getConfiguration();
+        Resources displayRes = context.getResources();
+        Configuration config = displayRes.getConfiguration();
+        int navigationSwDp = getNavigationSmallestScreenWidthDp(
+                context, config.smallestScreenWidthDp);
+        Configuration navigationConfig = new Configuration(config);
+        navigationConfig.smallestScreenWidthDp = navigationSwDp;
+        Resources systemRes = context.createConfigurationContext(navigationConfig).getResources();
 
-        boolean isLargeScreen = config.smallestScreenWidthDp > MIN_TABLET_WIDTH;
+        boolean isLargeScreen = navigationSwDp > MIN_TABLET_WIDTH;
         boolean isGesture = isGestureNav(context);
         boolean isPortrait = config.screenHeightDp > config.screenWidthDp;
         boolean isDefaultLandscape = isDefaultLandscape(context);
@@ -321,14 +326,15 @@ public class WindowManagerProxy {
         int minSize = Math.min(displayInfo.size.x, displayInfo.size.y);
         int swDp = (int) dpiFromPx(minSize, densityDpi);
 
+        int navigationSwDp = getNavigationSmallestScreenWidthDp(context, swDp);
         Resources systemRes;
         {
             Configuration conf = new Configuration();
-            conf.smallestScreenWidthDp = swDp;
+            conf.smallestScreenWidthDp = navigationSwDp;
             systemRes = context.createConfigurationContext(conf).getResources();
         }
 
-        boolean isTablet = swDp >= MIN_TABLET_WIDTH;
+        boolean isTablet = navigationSwDp >= MIN_TABLET_WIDTH;
         boolean isTabletOrGesture = isTablet || isGestureNav(context);
 
         // Use the status bar height resources because current system API to get the status bar
@@ -501,6 +507,29 @@ public class WindowManagerProxy {
         return getDisplayId(displayInfoContext) != DEFAULT_DISPLAY;
     }
 
+    /** Returns whether a display follows the device's built-in display style. */
+    public boolean isPrimaryStyleDisplay(Context displayInfoContext) {
+        Display display = getDisplay(displayInfoContext);
+        return display != null && display.getType() == Display.TYPE_INTERNAL;
+    }
+
+    private Context getPrimaryDisplayContext(Context context) {
+        Display primaryDisplay = context.getSystemService(DisplayManager.class)
+                .getDisplay(DEFAULT_DISPLAY);
+        return primaryDisplay == null ? null : context.createDisplayContext(primaryDisplay);
+    }
+
+    /** Returns the primary display's size for nav-bar placement on primary-style displays. */
+    private int getNavigationSmallestScreenWidthDp(Context context, int fallback) {
+        if (getDisplayId(context) == DEFAULT_DISPLAY || !isPrimaryStyleDisplay(context)) {
+            return fallback;
+        }
+        Context primaryContext = getPrimaryDisplayContext(context);
+        return primaryContext == null
+                ? fallback
+                : primaryContext.getResources().getConfiguration().smallestScreenWidthDp;
+    }
+
     /**
      * Returns a DisplayCutout which represents a rotated version of the original
      */
@@ -512,18 +541,25 @@ public class WindowManagerProxy {
     }
 
     /**
-     * Returns the current navigation mode from resource if the context is for the default or a non-
-     * display context. Otherwise, return NavigationMode.THREE_BUTTONS.
+     * Returns the current navigation mode from the display resource. Primary-style external
+     * displays use the primary display's navigation mode; other external displays use three-button
+     * navigation.
      */
     public NavigationMode getNavigationMode(Context displayInfoContext) {
-        // Always assume 3-button nav for external displays
         int displayId = getDisplayId(displayInfoContext);
-        if (displayId != DEFAULT_DISPLAY) {
+        boolean usePrimaryDisplayNavigation = displayId != DEFAULT_DISPLAY
+                && isPrimaryStyleDisplay(displayInfoContext);
+        if (displayId != DEFAULT_DISPLAY && !usePrimaryDisplayNavigation) {
+            return NavigationMode.THREE_BUTTONS;
+        }
+        Context navigationContext = usePrimaryDisplayNavigation
+                ? getPrimaryDisplayContext(displayInfoContext) : displayInfoContext;
+        if (navigationContext == null) {
             return NavigationMode.THREE_BUTTONS;
         }
         // Otherwise get from Resource
         int modeInt = ResourceUtils.getIntegerByName(NAV_BAR_INTERACTION_MODE_RES_NAME,
-                displayInfoContext.getResources(), INVALID_RESOURCE_HANDLE);
+                navigationContext.getResources(), INVALID_RESOURCE_HANDLE);
 
         if (modeInt == INVALID_RESOURCE_HANDLE) {
             Log.e(TAG, "Failed to get system resource ID. Incompatible framework version?");

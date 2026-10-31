@@ -30,6 +30,7 @@ import com.android.launcher3.LauncherSettings.Favorites.CELLY
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_DESKTOP
 import com.android.launcher3.LauncherSettings.Favorites.CONTAINER_HOTSEAT
+import com.android.launcher3.LauncherSettings.Favorites.DISPLAY_KEY
 import com.android.launcher3.LauncherSettings.Favorites.INTENT
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE
 import com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
@@ -44,17 +45,15 @@ import com.android.launcher3.LauncherSettings.Favorites._ID
 import com.android.launcher3.model.data.AppPairInfo
 import com.android.launcher3.util.IntArray
 import com.android.launcher3.widget.WidgetManagerHelper
-import kotlin.math.max
 
 @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
 class DbReader(val mDb: SQLiteDatabase, val mTableName: String, val mContext: Context) {
-    var mLastScreenId: Int = -1
-
-    var mWorkspaceEntriesByScreenId: MutableMap<Int, MutableList<DbEntry>> = ArrayMap()
+    var mWorkspaceEntriesByScreenId: MutableMap<Pair<String, Int>, MutableList<DbEntry>> =
+        ArrayMap()
 
     fun loadHotseatEntries(): List<DbEntry> {
         val hotseatEntries: MutableList<DbEntry> = ArrayList()
-        val columnsToRead = arrayOf(_ID, ITEM_TYPE, INTENT, SCREEN)
+        val columnsToRead = arrayOf(_ID, ITEM_TYPE, INTENT, SCREEN, DISPLAY_KEY)
         val c =
             ModelCursorWrapper(
                 queryWorkspace(columnsToRead, (CONTAINER + " = " + CONTAINER_HOTSEAT)),
@@ -68,6 +67,7 @@ class DbReader(val mDb: SQLiteDatabase, val mTableName: String, val mContext: Co
                     id = c.id
                     itemType = c.itemType
                     screenId = c.screen
+                    displayKey = c.displayKey.orEmpty()
                 }
 
             try {
@@ -127,6 +127,7 @@ class DbReader(val mDb: SQLiteDatabase, val mTableName: String, val mContext: Co
                 INTENT,
                 APPWIDGET_PROVIDER,
                 APPWIDGET_ID,
+                DISPLAY_KEY,
             )
         val c =
             ModelCursorWrapper(
@@ -142,13 +143,12 @@ class DbReader(val mDb: SQLiteDatabase, val mTableName: String, val mContext: Co
                     id = c.id
                     itemType = c.itemType
                     screenId = c.screen
+                    displayKey = c.displayKey.orEmpty()
                     cellX = c.cellX
                     cellY = c.cellY
                     spanX = c.spanX
                     spanY = c.spanY
                 }
-            mLastScreenId = max(mLastScreenId, entry.screenId)
-
             try {
                 // calculate weight
                 when (entry.itemType) {
@@ -198,7 +198,9 @@ class DbReader(val mDb: SQLiteDatabase, val mTableName: String, val mContext: Co
                 continue
             }
             workspaceEntries.add(entry)
-            mWorkspaceEntriesByScreenId.getOrPut(entry.screenId, ::ArrayList).add(entry)
+            mWorkspaceEntriesByScreenId
+                .getOrPut(entry.displayKey to entry.screenId, ::ArrayList)
+                .add(entry)
         }
         GridSizeMigrationDBController.removeEntryFromDb(mDb, mTableName, entriesToRemove)
         c.close()

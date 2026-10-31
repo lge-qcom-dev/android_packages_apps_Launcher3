@@ -29,6 +29,7 @@ data class DeviceConfiguration(
     val isMultiDisplay: Boolean,
     val isGestureMode: Boolean,
     val isWorkspaceItemsLabelHidden: Boolean,
+    val canNavBarMove: Boolean = true,
 )
 
 data class TaskbarConfiguration(val isTaskbarPresent: Boolean)
@@ -54,11 +55,10 @@ data class DeviceProperties(
 ) {
 
     /**
-     * Whether the navigation bar is allowed to move to the side of the display in landscape. Large
-     * screens always keep it at the bottom, mirroring the framework's config_navBarCanMove.
+     * Whether the navigation bar is allowed to move to the side of the display in landscape.
      */
     val canNavBarMove: Boolean
-        get() = isPhone
+        get() = deviceConfiguration.canNavBarMove
 
     fun createWindowBounds() =
         WindowBounds(widthPx, heightPx, availableWidthPx, availableHeightPx, rotationHint, densityDpi)

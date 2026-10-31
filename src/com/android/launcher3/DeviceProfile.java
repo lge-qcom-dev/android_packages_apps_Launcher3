@@ -1772,7 +1772,8 @@ public class DeviceProfile {
                                     mTransposeLayoutWithOrientation,
                                     mIsMultiDisplay,
                                     mIsGestureMode,
-                                    mIsWorkspaceItemsLabelHidden
+                                    mIsWorkspaceItemsLabelHidden,
+                                    !mInfo.isLargeScreenForNavigation(mWindowBounds)
                             ),
                             mWMProxy.isTaskbarDrawnInProcess()
                     ),
